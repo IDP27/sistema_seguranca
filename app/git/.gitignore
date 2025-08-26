@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.sqlite3
+
+# Virtualenv
+.venv/
+venv/
+
+# IDE/Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# DB local
+app.db
+
+# Frontend builds (se um dia usar bundlers)
+dist/
+build/

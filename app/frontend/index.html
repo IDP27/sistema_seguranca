@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sistema de Segurança • Frontend</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <header class="topbar">
+    <div class="left">
+      <h1>🔐 Sistema de Segurança</h1>
+      <span class="tag">Frontend</span>
+    </div>
+    <div class="right">
+      <span id="whoami" class="badge">deslogado</span>
+      <button id="btnLogout" class="btn ghost hidden">Sair</button>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- painel lateral: config + login -->
+    <section class="card">
+      <h2>Configuração & Login</h2>
+      <label>Base URL da API
+        <input id="baseUrl" placeholder="http://127.0.0.1:8005" value="http://127.0.0.1:8005"/>
+      </label>
+
+      <div class="sep"></div>
+
+      <div class="row two">
+        <label>Usuário
+          <input id="username" placeholder="admin" value="admin"/>
+        </label>
+        <label>Senha
+          <input id="password" type="password" placeholder="admin123" value="admin123"/>
+        </label>
+      </div>
+      <div class="actions">
+        <button id="btnLogin" class="btn">Entrar</button>
+        <button id="btnMe" class="btn ghost">Quem sou eu</button>
+      </div>
+
+      <div class="sep"></div>
+      <div class="muted small" id="statusLine"></div>
+      <p class="muted small">dica: em dev, habilite CORS no backend para 127.0.0.1:5500.</p>
+    </section>
+
+    <!-- painel principal: operações -->
+    <section class="card">
+      <h2>Operações</h2>
+
+      <!-- áreas -->
+      <h3>Áreas & Permissões</h3>
+      <div class="actions">
+        <button id="btnAllowed" class="btn ghost">Ver Áreas Permitidas</button>
+        <input id="enterAreaName" placeholder="ex.: recepcao" style="max-width:240px"/>
+        <button id="btnEnterArea" class="btn">Entrar na Área</button>
+      </div>
+      <pre id="areasOut" class="mono box"></pre>
+
+      <div class="sep"></div>
+
+      <!-- recursos -->
+      <h3>Gestão de Recursos</h3>
+      <div class="row three">
+        <label>q (busca)
+          <input id="resQ" placeholder="camera"/>
+        </label>
+        <label>category
+          <input id="resCat" placeholder="equipamento"/>
+        </label>
+        <label>location
+          <input id="resLoc" placeholder="Bloco A"/>
+        </label>
+      </div>
+      <div class="row three">
+        <label>min_qty
+          <input id="resMin" type="number" min="0"/>
+        </label>
+        <label>max_qty
+          <input id="resMax" type="number" min="0"/>
+        </label>
+        <label>sort
+          <select id="resSort">
+            <option value="name">name</option>
+            <option value="-name">-name</option>
+            <option value="quantity">quantity</option>
+            <option value="-quantity">-quantity</option>
+            <option value="created_at">created_at</option>
+            <option value="-created_at">-created_at</option>
+          </select>
+        </label>
+      </div>
+      <div class="row three">
+        <label>page
+          <input id="resPage" type="number" min="1" value="1"/>
+        </label>
+        <label>size
+          <input id="resSize" type="number" min="1" max="100" value="10"/>
+        </label>
+        <div class="actions end">
+          <button id="btnListResources" class="btn ghost">Listar</button>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="row two">
+        <label>Nome
+          <input id="rcName" placeholder="Câmera IP"/>
+        </label>
+        <label>Categoria
+          <input id="rcCat" placeholder="equipamento"/>
+        </label>
+      </div>
+      <div class="row two">
+        <label>Quantidade
+          <input id="rcQty" type="number" min="0" value="1"/>
+        </label>
+        <label>Localização
+          <input id="rcLoc" placeholder="Bloco A - Sala 101"/>
+        </label>
+      </div>
+      <label>Descrição
+        <textarea id="rcDesc" rows="2" placeholder="observações..."></textarea>
+      </label>
+      <div class="actions">
+        <button id="btnCreateResource" class="btn adminOnly">Criar (ADMIN/MANAGER)</button>
+        <input id="resId" placeholder="ID p/ atualizar/apagar" style="max-width:200px"/>
+        <button id="btnUpdateResource" class="btn ghost adminOnly">Atualizar</button>
+        <button id="btnDeleteResource" class="btn danger adminOnly">Deletar</button>
+      </div>
+
+      <div id="resourcesBox" class="box" style="margin-top:10px">—</div>
+
+      <div class="sep"></div>
+
+      <!-- logs -->
+      <h3>Logs (ADMIN)</h3>
+      <div class="row three">
+        <label>user_id
+          <input id="lgUser" type="number" min="0"/>
+        </label>
+        <label>area
+          <input id="lgArea" placeholder="recepcao"/>
+        </label>
+        <label>allowed
+          <select id="lgAllowed">
+            <option value="">(todos)</option>
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </label>
+      </div>
+      <div class="row two">
+        <label>limit
+          <input id="lgLimit" type="number" min="1" max="500" value="100"/>
+        </label>
+      </div>
+      <div class="actions">
+        <button id="btnListLogs" class="btn ghost adminOnly">Listar Logs</button>
+        <input id="logId" placeholder="ID do log" style="max-width:160px"/>
+        <button id="btnUpdateLog" class="btn adminOnly">Atualizar Log</button>
+        <button id="btnDeleteLog" class="btn danger adminOnly">Deletar Log</button>
+        <button id="btnDeleteAllLogs" class="btn danger adminOnly">Zerar Todos</button>
+      </div>
+      <label class="small muted">Atualizar Log – JSON body (opcional):</label>
+      <textarea id="logUpdateBody" rows="3" class="mono"
+        placeholder='{"reason":"ajuste","area":"sala_reuniao","allowed":true}'></textarea>
+      <pre id="logsOut" class="mono box"></pre>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
