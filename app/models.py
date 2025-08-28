@@ -5,9 +5,6 @@ from datetime import datetime
 from .database import Base
 
 
-# ----------------------------
-# User
-# ----------------------------
 class User(Base):
     __tablename__ = "users"
 
@@ -19,9 +16,6 @@ class User(Base):
     logs = relationship("AccessLog", back_populates="user", cascade="all, delete-orphan")
 
 
-# ----------------------------
-# AccessLog
-# ----------------------------
 class AccessLog(Base):
     __tablename__ = "access_logs"
 
@@ -35,17 +29,14 @@ class AccessLog(Base):
     user = relationship("User", back_populates="logs")
 
 
-# ----------------------------
-# Resource (Gestão de Recursos)
-# ----------------------------
 class Resource(Base):
     __tablename__ = "resources"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, index=True)       # nome do recurso
-    category = Column(String, nullable=False, index=True)   # ex.: equipamento, veiculo, dispositivo
-    quantity = Column(Integer, nullable=False, default=1)   # quantidade disponível
-    location = Column(String, nullable=True, index=True)    # ex.: almoxarifado, bloco A
-    description = Column(String, nullable=True)             # observações
+    name = Column(String, nullable=False, index=True)
+    category = Column(String, nullable=False, index=True)
+    quantity = Column(Integer, nullable=False, default=1)
+    location = Column(String, nullable=True, index=True)
+    description = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)

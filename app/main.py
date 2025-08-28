@@ -1,55 +1,43 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import func, distinct
 
 from .database import Base, engine, SessionLocal
 from .models import User, AccessLog, Resource
 from .schemas import (
-    # Usuários / Auth / Áreas / Logs
-    UserCreate,
-    UserOut,
-    Token,
-    LoginRequest,
-    EnterAreaRequest,
-    AccessLogOut,
-    # Recursos
-    ResourceCreate,
-    ResourceUpdate,
-    ResourceOut,
-    ResourceListOut,
+    # Users / Auth / Logs
+    UserCreate, UserUpdate, UserOut, UserListOut,
+    Token, LoginRequest, AccessLogOut,
+    # Resources
+    ResourceCreate, ResourceUpdate, ResourceOut, ResourceListOut,
 )
 from .auth import (
-    get_db,
-    get_password_hash,
-    verify_password,
-    create_access_token,
-    get_current_user,
-    require_roles,
+    get_db, get_password_hash, verify_password,
+    create_access_token, get_current_user, require_roles,
 )
 from .roles import Role, AREA_PERMISSIONS, can_access
 
 
 app = FastAPI(title="Sistema de Gerenciamento de Segurança")
 
-# ----- CORS (corrigido: apenas uma configuração, sem aninhar) -----
+# ---------- CORS (dev) ----------
+# permite http://localhost:PORTA / http://127.0.0.1:PORTA / http://[::1]:PORTA
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
-    ],
+    allow_origin_regex=r"^http://(\[::1\]|localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
-    allow_methods=["*"],   # OPTIONS, GET, POST, PUT, DELETE, etc.
-    allow_headers=["*"],   # Content-Type, Authorization, etc.
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Cria tabelas
 Base.metadata.create_all(bind=engine)
 
-# Seed: garante um admin inicial
+# Seed inicial: admin/admin123
 @app.on_event("startup")
 def ensure_admin_user():
     db = SessionLocal()
@@ -67,6 +55,20 @@ def ensure_admin_user():
     finally:
         db.close()
 
+# ---------- ROOT / HEALTH ----------
+@app.get("/")
+def root():
+    return {
+        "app": "Sistema de Gerenciamento de Segurança",
+        "status": "ok",
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "health": "/healthz",
+    }
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok", "time": datetime.utcnow().isoformat() + "Z"}
 
 # ---------- AUTH ----------
 @app.post("/auth/login", response_model=Token)
@@ -74,10 +76,8 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == payload.username).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
-
     token = create_access_token({"sub": user.username, "role": user.role})
     return {"access_token": token, "token_type": "bearer"}
-
 
 @app.post("/auth/register", response_model=UserOut)
 def register_user(
@@ -88,9 +88,8 @@ def register_user(
     exists = db.query(User).filter(User.username == new_user.username).first()
     if exists:
         raise HTTPException(status_code=400, detail="Usuário já existe")
-
     user = User(
-        username=new_user.username,
+        username=new_user.username.strip(),
         password_hash=get_password_hash(new_user.password),
         role=new_user.role.value,
     )
@@ -99,44 +98,119 @@ def register_user(
     db.refresh(user)
     return user
 
-
 @app.post("/auth/logout")
 def logout(_: User = Depends(get_current_user)):
-    # JWT é stateless; logout do lado do cliente remove o token.
-    return {"message": "Logout efetuado (apague o token no cliente)."}
-
+    return {"message": "Logout efetuado (remova o token no cliente)."}
 
 # ---------- USERS ----------
 @app.get("/users/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)):
     return user
 
+@app.get("/users", response_model=UserListOut)
+def list_users(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(Role.SECURITY_ADMIN)),
+    q: Optional[str] = None,                       # busca por username
+    role: Optional[Role] = Query(default=None),    # filtro por role
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=10, ge=1, le=100),
+    sort: str = Query(default="username"),         # username | -username | id | -id
+):
+    qset = db.query(User)
+    if q:
+        like = f"%{q}%"
+        qset = qset.filter(User.username.ilike(like))
+    if role is not None:
+        qset = qset.filter(User.role == role.value)
 
-# ---------- ÁREAS & PERMISSÕES ----------
+    total = qset.count()
+
+    sort_map = {
+        "username": User.username.asc(),
+        "-username": User.username.desc(),
+        "id": User.id.asc(),
+        "-id": User.id.desc(),
+    }
+    qset = qset.order_by(sort_map.get(sort, User.username.asc()))
+    offset = (page - 1) * size
+    items = qset.offset(offset).limit(size).all()
+
+    return {"total": total, "page": page, "size": size, "items": items}
+
+@app.get("/users/{user_id}", response_model=UserOut)
+def get_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(Role.SECURITY_ADMIN)),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    return user
+
+@app.put("/users/{user_id}", response_model=UserOut)
+def update_user(
+    user_id: int,
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(Role.SECURITY_ADMIN)),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    if payload.username is not None:
+        new_username = payload.username.strip()
+        if new_username != user.username:
+            exists = db.query(User).filter(User.username == new_username).first()
+            if exists:
+                raise HTTPException(status_code=400, detail="Já existe um usuário com este username")
+            user.username = new_username
+
+    if payload.password is not None:
+        user.password_hash = get_password_hash(payload.password)
+
+    if payload.role is not None:
+        user.role = payload.role.value
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+@app.delete("/users/{user_id}", status_code=204)
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(Role.SECURITY_ADMIN)),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    db.delete(user)
+    db.commit()
+    return None
+
+# ---------- ÁREAS ----------
 @app.get("/areas/allowed", response_model=List[str])
 def list_my_allowed_areas(user: User = Depends(get_current_user)):
-    role = Role(user.role)
-    if role == Role.SECURITY_ADMIN:
+    role_obj = Role(user.role)
+    if role_obj == Role.SECURITY_ADMIN:
         return ["*"]
-    return sorted(list(AREA_PERMISSIONS.get(role, set())))
-
+    return sorted(list(AREA_PERMISSIONS.get(role_obj, set())))
 
 @app.post("/areas/{area}/enter", response_model=AccessLogOut)
 def enter_area(area: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    role = Role(user.role)
-    allowed = can_access(role, area)
-
-    reason = None if allowed else f"Acesso negado: {role} não tem permissão para {area}"
+    role_obj = Role(user.role)
+    allowed = can_access(role_obj, area)
+    reason = None if allowed else f"Acesso negado: {role_obj} não tem permissão para {area}"
     log = AccessLog(user_id=user.id, area=area, timestamp=datetime.utcnow(), allowed=allowed, reason=reason)
     db.add(log)
     db.commit()
     db.refresh(log)
-
     if not allowed:
         raise HTTPException(status_code=403, detail=reason)
-
     return log
-
 
 # ---------- LOGS ----------
 @app.get("/logs", response_model=List[AccessLogOut])
@@ -158,8 +232,6 @@ def list_logs(
     q = q.order_by(AccessLog.timestamp.desc()).limit(min(limit, 500))
     return q.all()
 
-
-# Atualizar um log (apenas SECURITY_ADMIN)
 @app.put("/logs/{log_id}", response_model=AccessLogOut)
 def update_log(
     log_id: int,
@@ -184,8 +256,6 @@ def update_log(
     db.refresh(log)
     return log
 
-
-# Deletar um log específico (apenas SECURITY_ADMIN)
 @app.delete("/logs/{log_id}", status_code=204)
 def delete_log(
     log_id: int,
@@ -199,8 +269,6 @@ def delete_log(
     db.commit()
     return None
 
-
-# Deletar todos os logs (apenas SECURITY_ADMIN)
 @app.delete("/logs", status_code=204)
 def delete_all_logs(
     db: Session = Depends(get_db),
@@ -210,25 +278,22 @@ def delete_all_logs(
     db.commit()
     return None
 
-
-# ---------- GESTÃO DE RECURSOS ----------
-# Listar com filtros/paginação (qualquer usuário autenticado)
+# ---------- RESOURCES ----------
 @app.get("/resources", response_model=ResourceListOut)
 def list_resources(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
-    q: Optional[str] = None,                  # busca por nome/descrição
+    q: Optional[str] = None,
     category: Optional[str] = None,
     location: Optional[str] = None,
     min_qty: Optional[int] = Query(default=None, ge=0),
     max_qty: Optional[int] = Query(default=None, ge=0),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=10, ge=1, le=100),
-    sort: str = Query(default="name"),        # name | -name | quantity | -quantity | created_at | -created_at
+    sort: str = Query(default="name"),
 ):
     qset = db.query(Resource)
 
-    # filtros
     if q:
         like = f"%{q}%"
         qset = qset.filter((Resource.name.ilike(like)) | (Resource.description.ilike(like)))
@@ -243,7 +308,6 @@ def list_resources(
 
     total = qset.count()
 
-    # ordenação
     sort_map = {
         "name": Resource.name.asc(),
         "-name": Resource.name.desc(),
@@ -254,19 +318,11 @@ def list_resources(
     }
     qset = qset.order_by(sort_map.get(sort, Resource.name.asc()))
 
-    # paginação
     offset = (page - 1) * size
     items = qset.offset(offset).limit(size).all()
 
-    return {
-        "total": total,
-        "page": page,
-        "size": size,
-        "items": items,
-    }
+    return {"total": total, "page": page, "size": size, "items": items}
 
-
-# Obter um recurso por ID (qualquer autenticado)
 @app.get("/resources/{resource_id}", response_model=ResourceOut)
 def get_resource(resource_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     resource = db.query(Resource).filter(Resource.id == resource_id).first()
@@ -274,8 +330,6 @@ def get_resource(resource_id: int, db: Session = Depends(get_db), _: User = Depe
         raise HTTPException(status_code=404, detail="Recurso não encontrado")
     return resource
 
-
-# Criar recurso (ADMIN e MANAGER)
 @app.post("/resources", response_model=ResourceOut, status_code=201)
 def create_resource(
     payload: ResourceCreate,
@@ -296,8 +350,6 @@ def create_resource(
     db.refresh(resource)
     return resource
 
-
-# Atualizar recurso (ADMIN e MANAGER)
 @app.put("/resources/{resource_id}", response_model=ResourceOut)
 def update_resource(
     resource_id: int,
@@ -325,8 +377,6 @@ def update_resource(
     db.refresh(resource)
     return resource
 
-
-# Remover recurso (ADMIN e MANAGER)
 @app.delete("/resources/{resource_id}", status_code=204)
 def delete_resource(
     resource_id: int,
@@ -340,8 +390,39 @@ def delete_resource(
     db.commit()
     return None
 
+# ---------- STATS ----------
+@app.get("/stats/overview")
+def stats_overview(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    now = datetime.utcnow()
+    start_of_day = datetime(now.year, now.month, now.day)
 
-# ---------- RESET (somente desenvolvimento) ----------
+    accesses_today = (
+        db.query(func.count(AccessLog.id))
+        .filter(AccessLog.timestamp >= start_of_day)
+        .scalar()
+        or 0
+    )
+    active_users_24h = (
+        db.query(func.count(distinct(AccessLog.user_id)))
+        .filter(AccessLog.timestamp >= now - timedelta(hours=24))
+        .scalar()
+        or 0
+    )
+    total_resources = db.query(func.count(Resource.id)).scalar() or 0
+    total_users = db.query(func.count(User.id)).scalar() or 0
+
+    return {
+        "accesses_today": accesses_today,
+        "active_users_24h": active_users_24h,
+        "total_resources": total_resources,
+        "total_users": total_users,
+        "time": now.isoformat() + "Z",
+    }
+
+# ---------- DEV RESET ----------
 @app.delete("/dev/reset", status_code=204)
 def reset_all(db: Session = Depends(get_db)):
     db.query(AccessLog).delete()
@@ -349,7 +430,6 @@ def reset_all(db: Session = Depends(get_db)):
     db.query(User).delete()
     db.commit()
 
-    # recria o admin
     admin = User(
         username="admin",
         password_hash=get_password_hash("admin123"),

@@ -5,11 +5,11 @@ class Role(str, Enum):
     MANAGER = "MANAGER"
     SECURITY_ADMIN = "SECURITY_ADMIN"
 
-# Áreas de exemplo — ajuste conforme sua realidade
+# Áreas exemplo
 AREA_PERMISSIONS = {
     Role.EMPLOYEE: {"recepcao", "escritorio1"},
     Role.MANAGER: {"recepcao", "escritorio1", "gerencia", "sala_reuniao"},
-    Role.SECURITY_ADMIN: {"*"},  # Tudo
+    Role.SECURITY_ADMIN: {"*"},
 }
 
 def can_access(role: Role, area: str) -> bool:

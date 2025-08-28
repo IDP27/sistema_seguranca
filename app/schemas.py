@@ -4,14 +4,16 @@ from datetime import datetime
 from .roles import Role
 
 
-# ----------------------------
-# User Schemas
-# ----------------------------
+# ---------- Users ----------
 class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=6, max_length=128)
     role: Role
 
+class UserUpdate(BaseModel):
+    username: Optional[str] = Field(default=None, min_length=3, max_length=50)
+    password: Optional[str] = Field(default=None, min_length=6, max_length=128)
+    role: Optional[Role] = None
 
 class UserOut(BaseModel):
     id: int
@@ -21,27 +23,24 @@ class UserOut(BaseModel):
     class Config:
         from_attributes = True
 
+class UserListOut(BaseModel):
+    total: int
+    page: int
+    size: int
+    items: List[UserOut]
 
-# ----------------------------
-# Auth Schemas
-# ----------------------------
+
+# ---------- Auth ----------
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
-
 
 class LoginRequest(BaseModel):
     username: str
     password: str
 
 
-# ----------------------------
-# Área / Acesso Schemas
-# ----------------------------
-class EnterAreaRequest(BaseModel):
-    area: str = Field(examples=["recepcao", "escritorio1", "gerencia", "sala_reuniao"])
-
-
+# ---------- Areas / Logs ----------
 class AccessLogOut(BaseModel):
     id: int
     user_id: int
@@ -54,9 +53,7 @@ class AccessLogOut(BaseModel):
         from_attributes = True
 
 
-# ----------------------------
-# Resource (Gestão de Recursos) Schemas
-# ----------------------------
+# ---------- Resources ----------
 class ResourceBase(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     category: str = Field(min_length=2, max_length=60)
@@ -64,10 +61,8 @@ class ResourceBase(BaseModel):
     location: Optional[str] = Field(default=None, max_length=120)
     description: Optional[str] = Field(default=None, max_length=500)
 
-
 class ResourceCreate(ResourceBase):
     pass
-
 
 class ResourceUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=2, max_length=120)
@@ -76,13 +71,11 @@ class ResourceUpdate(BaseModel):
     location: Optional[str] = Field(default=None, max_length=120)
     description: Optional[str] = Field(default=None, max_length=500)
 
-
 class ResourceOut(ResourceBase):
     id: int
 
     class Config:
         from_attributes = True
-
 
 class ResourceListOut(BaseModel):
     total: int

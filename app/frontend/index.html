@@ -1,176 +1,307 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sistema de Segurança • Frontend</title>
+  <title>Sistema de Gerenciamento de Segurança</title>
   <link rel="stylesheet" href="style.css"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
 </head>
 <body>
-  <header class="topbar">
-    <div class="left">
-      <h1>🔐 Sistema de Segurança</h1>
-      <span class="tag">Frontend</span>
+
+  <!-- Tela de Login -->
+  <div id="login-screen" class="screen active">
+    <div class="login-container">
+      <div class="logo">
+        <i class="fas fa-shield-alt"></i>
+        <h1>Sistema de Segurança</h1>
+      </div>
+
+      <div class="input-group">
+        <i class="fas fa-user"></i>
+        <input type="text" id="username" placeholder="Usuário" value="admin" required/>
+      </div>
+      <div class="input-group">
+        <i class="fas fa-lock"></i>
+        <input type="password" id="password" placeholder="Senha" value="admin123" required/>
+      </div>
+
+      <div class="input-group">
+        <i class="fas fa-globe"></i>
+        <input type="text" id="api-base" placeholder="http://127.0.0.1:8005" value="http://127.0.0.1:8005" />
+      </div>
+
+      <button id="login-btn" class="btn-primary">Entrar</button>
+      <p id="login-error" class="error-message"></p>
     </div>
-    <div class="right">
-      <span id="whoami" class="badge">deslogado</span>
-      <button id="btnLogout" class="btn ghost hidden">Sair</button>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="screen">
+    <header class="header">
+      <div class="header-left">
+        <button id="sidebar-toggle" class="btn-icon"><i class="fas fa-bars"></i></button>
+        <h2>Sistema de Segurança</h2>
+      </div>
+      <div class="header-right">
+        <span id="user-info">Usuário: <span id="username-display"></span> (<span id="user-role"></span>)</span>
+        <button id="logout-btn" class="btn-secondary">Sair</button>
+      </div>
+    </header>
+
+    <div class="main-container">
+      <!-- Sidebar -->
+      <nav id="sidebar" class="sidebar">
+        <ul class="nav-menu">
+          <li><a href="#" class="nav-link active" data-section="dashboard-home"><i class="fas fa-home"></i> <span>Início</span></a></li>
+          <li><a href="#" class="nav-link" data-section="access-control"><i class="fas fa-door-open"></i> <span>Controle de Acesso</span></a></li>
+          <li><a href="#" class="nav-link" data-section="resources"><i class="fas fa-box"></i> <span>Recursos</span></a></li>
+          <li id="logs-menu-item" style="display:none"><a href="#" class="nav-link" data-section="logs"><i class="fas fa-history"></i> <span>Logs</span></a></li>
+          <li id="users-menu-item" style="display:none"><a href="#" class="nav-link" data-section="users"><i class="fas fa-users"></i> <span>Usuários</span></a></li>
+        </ul>
+      </nav>
+
+      <!-- Conteúdo -->
+      <main class="content">
+        <!-- Home -->
+        <section id="dashboard-home" class="content-section active">
+          <h3>Visão Geral</h3>
+
+          <div class="stats-grid">
+            <div class="stat-card clickable" id="card-accesses">
+              <div class="stat-icon"><i class="fas fa-door-open"></i></div>
+              <div class="stat-info">
+                <h4>Acessos Hoje</h4>
+                <p id="access-today">0</p>
+              </div>
+            </div>
+
+            <div class="stat-card clickable" id="card-active-users">
+              <div class="stat-icon"><i class="fas fa-users"></i></div>
+              <div class="stat-info">
+                <h4>Usuários Ativos</h4>
+                <p id="active-users">0</p>
+              </div>
+            </div>
+
+            <div class="stat-card clickable" id="card-total-resources">
+              <div class="stat-icon"><i class="fas fa-box"></i></div>
+              <div class="stat-info">
+                <h4>Total de Recursos</h4>
+                <p id="total-resources">0</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="quick-actions">
+            <h4>Ações Rápidas</h4>
+            <div class="actions-grid">
+              <button class="action-btn" onclick="showSection('access-control')">
+                <i class="fas fa-door-open"></i><span>Acessar Área</span>
+              </button>
+              <button class="action-btn" onclick="showSection('resources')">
+                <i class="fas fa-box"></i><span>Gerenciar Recursos</span>
+              </button>
+              <button id="quick-logs-btn" class="action-btn" onclick="showSection('logs')" style="display:none;">
+                <i class="fas fa-history"></i><span>Visualizar Logs</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Controle de Acesso -->
+        <section id="access-control" class="content-section">
+          <h3>Controle de Acesso</h3>
+          <div class="access-control-panel">
+            <div class="access-form">
+              <h4>Acessar Área</h4>
+              <div class="input-group">
+                <label for="area-select">Selecione a área:</label>
+                <select id="area-select">
+                  <option value="">Selecione uma área</option>
+                </select>
+              </div>
+              <button id="access-area-btn" class="btn-primary">Acessar Área</button>
+            </div>
+            <div class="access-result">
+              <h4>Resultado do Acesso</h4>
+              <div id="access-result-content">
+                <p>Selecione uma área e tente acessar para ver o resultado.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Recursos -->
+        <section id="resources" class="content-section">
+          <h3>Gerenciamento de Recursos</h3>
+
+          <div class="resource-filters">
+            <input type="text" id="resource-search" placeholder="Buscar recursos..."/>
+            <input type="text" id="resource-category" placeholder="Categoria"/>
+            <input type="text" id="resource-location" placeholder="Localização"/>
+            <button id="apply-filters" class="btn-primary">Aplicar Filtros</button>
+            <button id="add-resource-btn" class="btn-success" style="display:none"><i class="fas fa-plus"></i> Novo Recurso</button>
+          </div>
+
+          <div class="resources-list">
+            <table id="resources-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Categoria</th>
+                  <th>Quantidade</th>
+                  <th>Localização</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="resources-tbody"></tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <button id="prev-page" class="btn-secondary">Anterior</button>
+            <span id="page-info">Página 1 de 1</span>
+            <button id="next-page" class="btn-secondary">Próxima</button>
+          </div>
+        </section>
+
+        <!-- Logs -->
+        <section id="logs" class="content-section">
+          <h3>Registros de Acesso</h3>
+          <div class="log-filters">
+            <input id="log-user" type="number" min="0" placeholder="user_id"/>
+            <input id="log-area" placeholder="Área"/>
+            <select id="log-status">
+              <option value="">Todos</option>
+              <option value="true">Permitido</option>
+              <option value="false">Negado</option>
+            </select>
+            <button id="apply-log-filters" class="btn-primary">Filtrar</button>
+            <button id="clear-logs-btn" class="btn-danger" style="display:none"><i class="fas fa-trash"></i> Limpar Todos</button>
+          </div>
+
+          <div class="logs-list">
+            <table id="logs-table">
+              <thead>
+                <tr>
+                  <th>Usuário</th>
+                  <th>Área</th>
+                  <th>Data/Hora</th>
+                  <th>Status</th>
+                  <th>Motivo</th>
+                </tr>
+              </thead>
+              <tbody id="logs-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Usuários -->
+        <section id="users" class="content-section">
+          <h3>Gerenciamento de Usuários</h3>
+
+          <div class="resource-filters">
+            <input type="text" id="user-search" placeholder="Buscar usuário (q)"/>
+            <select id="user-role-filter">
+              <option value="">(todas as roles)</option>
+              <option value="EMPLOYEE">EMPLOYEE</option>
+              <option value="MANAGER">MANAGER</option>
+              <option value="SECURITY_ADMIN">SECURITY_ADMIN</option>
+            </select>
+            <button id="apply-user-filters" class="btn-primary">Filtrar</button>
+            <button id="add-user-btn" class="btn-success"><i class="fas fa-plus"></i> Novo Usuário</button>
+          </div>
+
+          <div class="users-list">
+            <table id="users-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Usuário</th>
+                  <th>Função</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody"></tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <button id="users-prev" class="btn-secondary">Anterior</button>
+            <span id="users-page-info">Página 1 de 1</span>
+            <button id="users-next" class="btn-secondary">Próxima</button>
+          </div>
+        </section>
+      </main>
     </div>
-  </header>
+  </div>
 
-  <main class="grid">
-    <!-- painel lateral: config + login -->
-    <section class="card">
-      <h2>Configuração & Login</h2>
-      <label>Base URL da API
-        <input id="baseUrl" placeholder="http://127.0.0.1:8005" value="http://127.0.0.1:8005"/>
-      </label>
-
-      <div class="sep"></div>
-
-      <div class="row two">
-        <label>Usuário
-          <input id="username" placeholder="admin" value="admin"/>
-        </label>
-        <label>Senha
-          <input id="password" type="password" placeholder="admin123" value="admin123"/>
-        </label>
-      </div>
-      <div class="actions">
-        <button id="btnLogin" class="btn">Entrar</button>
-        <button id="btnMe" class="btn ghost">Quem sou eu</button>
-      </div>
-
-      <div class="sep"></div>
-      <div class="muted small" id="statusLine"></div>
-      <p class="muted small">dica: em dev, habilite CORS no backend para 127.0.0.1:5500.</p>
-    </section>
-
-    <!-- painel principal: operações -->
-    <section class="card">
-      <h2>Operações</h2>
-
-      <!-- áreas -->
-      <h3>Áreas & Permissões</h3>
-      <div class="actions">
-        <button id="btnAllowed" class="btn ghost">Ver Áreas Permitidas</button>
-        <input id="enterAreaName" placeholder="ex.: recepcao" style="max-width:240px"/>
-        <button id="btnEnterArea" class="btn">Entrar na Área</button>
-      </div>
-      <pre id="areasOut" class="mono box"></pre>
-
-      <div class="sep"></div>
-
-      <!-- recursos -->
-      <h3>Gestão de Recursos</h3>
-      <div class="row three">
-        <label>q (busca)
-          <input id="resQ" placeholder="camera"/>
-        </label>
-        <label>category
-          <input id="resCat" placeholder="equipamento"/>
-        </label>
-        <label>location
-          <input id="resLoc" placeholder="Bloco A"/>
-        </label>
-      </div>
-      <div class="row three">
-        <label>min_qty
-          <input id="resMin" type="number" min="0"/>
-        </label>
-        <label>max_qty
-          <input id="resMax" type="number" min="0"/>
-        </label>
-        <label>sort
-          <select id="resSort">
-            <option value="name">name</option>
-            <option value="-name">-name</option>
-            <option value="quantity">quantity</option>
-            <option value="-quantity">-quantity</option>
-            <option value="created_at">created_at</option>
-            <option value="-created_at">-created_at</option>
-          </select>
-        </label>
-      </div>
-      <div class="row three">
-        <label>page
-          <input id="resPage" type="number" min="1" value="1"/>
-        </label>
-        <label>size
-          <input id="resSize" type="number" min="1" max="100" value="10"/>
-        </label>
-        <div class="actions end">
-          <button id="btnListResources" class="btn ghost">Listar</button>
+  <!-- Modal Recurso -->
+  <div id="resource-modal" class="modal">
+    <div class="modal-content">
+      <span class="close" data-close="resource-modal">&times;</span>
+      <h3 id="resource-modal-title">Adicionar Recurso</h3>
+      <form id="resource-form">
+        <input type="hidden" id="resource-id"/>
+        <div class="input-group">
+          <label for="resource-name">Nome</label>
+          <input type="text" id="resource-name" required/>
         </div>
-      </div>
+        <div class="input-group">
+          <label for="resource-category-modal">Categoria</label>
+          <input type="text" id="resource-category-modal" required/>
+        </div>
+        <div class="input-group">
+          <label for="resource-quantity">Quantidade</label>
+          <input type="number" id="resource-quantity" min="0" required/>
+        </div>
+        <div class="input-group">
+          <label for="resource-location-modal">Localização</label>
+          <input type="text" id="resource-location-modal"/>
+        </div>
+        <div class="input-group">
+          <label for="resource-description">Descrição</label>
+          <textarea id="resource-description" rows="3"></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" data-close="resource-modal">Cancelar</button>
+          <button type="submit" class="btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-      <div class="sep"></div>
-
-      <div class="row two">
-        <label>Nome
-          <input id="rcName" placeholder="Câmera IP"/>
-        </label>
-        <label>Categoria
-          <input id="rcCat" placeholder="equipamento"/>
-        </label>
-      </div>
-      <div class="row two">
-        <label>Quantidade
-          <input id="rcQty" type="number" min="0" value="1"/>
-        </label>
-        <label>Localização
-          <input id="rcLoc" placeholder="Bloco A - Sala 101"/>
-        </label>
-      </div>
-      <label>Descrição
-        <textarea id="rcDesc" rows="2" placeholder="observações..."></textarea>
-      </label>
-      <div class="actions">
-        <button id="btnCreateResource" class="btn adminOnly">Criar (ADMIN/MANAGER)</button>
-        <input id="resId" placeholder="ID p/ atualizar/apagar" style="max-width:200px"/>
-        <button id="btnUpdateResource" class="btn ghost adminOnly">Atualizar</button>
-        <button id="btnDeleteResource" class="btn danger adminOnly">Deletar</button>
-      </div>
-
-      <div id="resourcesBox" class="box" style="margin-top:10px">—</div>
-
-      <div class="sep"></div>
-
-      <!-- logs -->
-      <h3>Logs (ADMIN)</h3>
-      <div class="row three">
-        <label>user_id
-          <input id="lgUser" type="number" min="0"/>
-        </label>
-        <label>area
-          <input id="lgArea" placeholder="recepcao"/>
-        </label>
-        <label>allowed
-          <select id="lgAllowed">
-            <option value="">(todos)</option>
-            <option value="true">true</option>
-            <option value="false">false</option>
+  <!-- Modal Usuário -->
+  <div id="user-modal" class="modal">
+    <div class="modal-content">
+      <span class="close" data-close="user-modal">&times;</span>
+      <h3 id="user-modal-title">Novo Usuário</h3>
+      <form id="user-form">
+        <input type="hidden" id="user-id"/>
+        <div class="input-group">
+          <label for="new-username">Usuário</label>
+          <input type="text" id="new-username" required/>
+        </div>
+        <div class="input-group">
+          <label for="new-password">Senha</label>
+          <input type="password" id="new-password" required/>
+        </div>
+        <div class="input-group">
+          <label for="new-role">Função</label>
+          <select id="new-role" required>
+            <option value="EMPLOYEE">EMPLOYEE</option>
+            <option value="MANAGER">MANAGER</option>
+            <option value="SECURITY_ADMIN">SECURITY_ADMIN</option>
           </select>
-        </label>
-      </div>
-      <div class="row two">
-        <label>limit
-          <input id="lgLimit" type="number" min="1" max="500" value="100"/>
-        </label>
-      </div>
-      <div class="actions">
-        <button id="btnListLogs" class="btn ghost adminOnly">Listar Logs</button>
-        <input id="logId" placeholder="ID do log" style="max-width:160px"/>
-        <button id="btnUpdateLog" class="btn adminOnly">Atualizar Log</button>
-        <button id="btnDeleteLog" class="btn danger adminOnly">Deletar Log</button>
-        <button id="btnDeleteAllLogs" class="btn danger adminOnly">Zerar Todos</button>
-      </div>
-      <label class="small muted">Atualizar Log – JSON body (opcional):</label>
-      <textarea id="logUpdateBody" rows="3" class="mono"
-        placeholder='{"reason":"ajuste","area":"sala_reuniao","allowed":true}'></textarea>
-      <pre id="logsOut" class="mono box"></pre>
-    </section>
-  </main>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" data-close="user-modal">Cancelar</button>
+          <button type="submit" class="btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

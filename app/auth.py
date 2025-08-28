@@ -19,8 +19,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8  # 8h
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer(auto_error=False)
 
-# --- DB Dependency ---
-
+# DB dependency
 def get_db():
     db = SessionLocal()
     try:
@@ -28,24 +27,21 @@ def get_db():
     finally:
         db.close()
 
-# --- Password helpers ---
-
+# Password helpers
 def verify_password(plain_password: str, password_hash: str) -> bool:
     return pwd_context.verify(plain_password, password_hash)
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
-# --- JWT helpers ---
-
+# JWT
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-# --- Current user & RBAC ---
-
+# Current user & RBAC
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: Session = Depends(get_db),
@@ -67,7 +63,6 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="User not found")
     return user
 
-
 def require_roles(*roles: Role):
     def _role_dependency(user: User = Depends(get_current_user)) -> User:
         try:
@@ -77,5 +72,4 @@ def require_roles(*roles: Role):
         if user_role not in roles:
             raise HTTPException(status_code=403, detail="Permissões insuficientes")
         return user
-
     return _role_dependency
