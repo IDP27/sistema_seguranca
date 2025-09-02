@@ -1,32 +1,41 @@
+// ============================================================
+// frontend.js — Lógica do frontend (SPA) para o Sistema de Segurança
+// Comentado em português, em UMA ÚNICA PÁGINA.
+// ============================================================
+
 // =====================
 // Config & Estado
 // =====================
+// Base da API (padrão local). Pode ser sobrescrita na tela de login.
 let API_BASE = 'http://127.0.0.1:8005';
+// Token JWT do usuário autenticado (mantido em memória e localStorage)
 let authToken = null;
+// Dados do usuário atual (username e role)
 let currentUser = null;
 
-// paginação recursos
+// Estado de paginação (recursos)
 let resPage = 1;
 const resSize = 10;
 
-// paginação usuários
+// Estado de paginação (usuários)
 let usersPage = 1;
 const usersSize = 10;
 
-// helpers DOM
+// Helpers para seleção no DOM
 const $  = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 
 // =====================
 // Boot
 // =====================
+// Ao carregar o DOM, conecta listeners, restaura API_BASE e token salvos.
 document.addEventListener('DOMContentLoaded', () => {
-  // listeners
   bindGlobalListeners();
 
-  // token salvo?
+  // Restaura API_BASE e token, se salvos no navegador
   const saved = localStorage.getItem('authToken');
   const savedApi = localStorage.getItem('apiBase');
+
   if (savedApi) {
     API_BASE = savedApi;
     const apiInput = $('#api-base');
@@ -34,23 +43,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (saved) {
     authToken = saved;
-    fetchCurrentUser();
+    fetchCurrentUser(); // tenta validar o token e carregar o dashboard
   }
 });
 
 // =====================
 // Listeners
 // =====================
+// Registra todos os listeners de botões, navegação, modais, etc.
 function bindGlobalListeners(){
-  // login
+  // Login
   $('#login-btn').addEventListener('click', doLogin);
 
-  // sidebar
+  // Toggle da sidebar
   $('#sidebar-toggle').addEventListener('click', () => {
     $('#sidebar').classList.toggle('collapsed');
   });
 
-  // navegação
+  // Navegação entre seções (SPA)
   $$('.nav-link').forEach(a=>{
     a.addEventListener('click', (e)=>{
       e.preventDefault();
@@ -59,7 +69,7 @@ function bindGlobalListeners(){
     });
   });
 
-  // logout
+  // Logout: limpa token e volta para tela de login
   $('#logout-btn').addEventListener('click', () => {
     authToken = null;
     currentUser = null;
@@ -67,43 +77,45 @@ function bindGlobalListeners(){
     showLogin();
   });
 
-  // acesso
+  // Acesso a áreas
   $('#access-area-btn').addEventListener('click', handleAreaAccess);
 
-  // recursos
+  // Recursos: filtros/paginação/CRUD
   $('#apply-filters').addEventListener('click', () => { resPage = 1; loadResources(); });
   $('#add-resource-btn').addEventListener('click', ()=> openResourceModal());
   $('#resource-form').addEventListener('submit', handleResourceSubmit);
   $('#prev-page').addEventListener('click', () => { if(resPage>1){resPage--; loadResources();} });
   $('#next-page').addEventListener('click', () => { resPage++; loadResources(); });
 
-  // logs
+  // Logs: filtros
   $('#apply-log-filters').addEventListener('click', loadLogs);
 
-  // usuários
+  // Usuários (apenas admin): filtros/paginação/CRUD
   $('#apply-user-filters').addEventListener('click', ()=>{ usersPage=1; loadUsers(); });
   $('#add-user-btn').addEventListener('click', ()=> openUserModal());
   $('#user-form').addEventListener('submit', handleUserSubmit);
   $('#users-prev').addEventListener('click', ()=>{ if(usersPage>1){usersPage--; loadUsers();} });
   $('#users-next').addEventListener('click', ()=>{ usersPage++; loadUsers(); });
 
-  // fechar modais
+  // Fechamento de modais (botões com data-close)
   $$('[data-close]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const id = btn.getAttribute('data-close');
       closeModal(id);
     });
   });
+  // Ícones X de fechar
   $$('.close').forEach(x=>{
     x.addEventListener('click', ()=>{
       closeModal(x.getAttribute('data-close') || x.closest('.modal').id);
     });
   });
+  // Clique fora do conteúdo fecha o modal
   window.addEventListener('click', (e)=>{
     if (e.target.classList.contains('modal')) e.target.style.display='none';
   });
 
-  // cards clicáveis
+  // Cards do dashboard → atalhos para seções
   const cardAccesses = $('#card-accesses');
   const cardActiveUsers = $('#card-active-users');
   const cardTotalResources = $('#card-total-resources');
@@ -115,11 +127,12 @@ function bindGlobalListeners(){
 // =====================
 // Auth
 // =====================
+// Realiza login: envia credenciais, salva token, busca /users/me e carrega dashboard.
 async function doLogin(){
   const u = $('#username').value.trim();
   const p = $('#password').value;
   const base = ($('#api-base').value || '').replace(/\/+$/,'');
-  API_BASE = base || API_BASE;
+  API_BASE = base || API_BASE;               // permite trocar a base da API via UI
   localStorage.setItem('apiBase', API_BASE);
 
   $('#login-error').textContent = '';
@@ -140,12 +153,13 @@ async function doLogin(){
     const data = await res.json();
     authToken = data.access_token;
     localStorage.setItem('authToken', authToken);
-    await fetchCurrentUser();
+    await fetchCurrentUser(); // carrega dados do usuário + UI
   }catch(e){
     $('#login-error').textContent = 'Erro de conexão. Verifique a API.';
   }
 }
 
+// Busca /users/me para validar token e configurar UI conforme role
 async function fetchCurrentUser(){
   try{
     const me = await authed(`${API_BASE}/users/me`);
@@ -156,7 +170,7 @@ async function fetchCurrentUser(){
     currentUser = await me.json();
     showDashboard();
 
-    // UI conforme role
+    // Mostra/oculta itens do menu conforme permissões
     const isAdmin   = currentUser.role === 'SECURITY_ADMIN';
     const isManager = isAdmin || currentUser.role === 'MANAGER';
     $('#logs-menu-item').style.display   = isAdmin ? 'block' : 'none';
@@ -165,7 +179,7 @@ async function fetchCurrentUser(){
     $('#add-resource-btn').style.display = isManager ? 'inline-block' : 'none';
     $('#clear-logs-btn').style.display   = isAdmin ? 'inline-block' : 'none';
 
-    // Dados iniciais
+    // Carregamento inicial do dashboard
     await loadOverview();
     await loadAllowedAreas();
     await loadResources();
@@ -174,11 +188,13 @@ async function fetchCurrentUser(){
   }
 }
 
+// Alterna para tela de login
 function showLogin(){
   $('#login-screen').classList.add('active');
   $('#dashboard').classList.remove('active');
 }
 
+// Alterna para dashboard e preenche header com usuário/role
 function showDashboard(){
   $('#login-screen').classList.remove('active');
   $('#dashboard').classList.add('active');
@@ -186,13 +202,13 @@ function showDashboard(){
   $('#user-role').textContent = currentUser.role;
 }
 
+// Ativa seção selecionada e carrega dados sob demanda
 function showSection(id){
   $$('.content-section').forEach(s=>s.classList.remove('active'));
   $(`#${id}`).classList.add('active');
   $$('.nav-link').forEach(a=>{
     a.classList.toggle('active', a.getAttribute('data-section')===id);
   });
-  // carregamentos sob demanda
   if (id==='logs') loadLogs();
   if (id==='users') loadUsers();
 }
@@ -200,6 +216,7 @@ function showSection(id){
 // =====================
 // Utils
 // =====================
+// Realiza fetch com header Authorization: Bearer <token>
 function authed(url, options={}){
   const headers = {
     'Authorization': `Bearer ${authToken}`,
@@ -208,20 +225,24 @@ function authed(url, options={}){
   return fetch(url, { ...options, headers });
 }
 
+// Alias (compat): mesma função do authed
 async function authenticatedFetch(url, options={}){
   return authed(url, options);
 }
 
+// Tenta ler JSON com proteção a erros
 async function safeJson(res){
   try{ return await res.json(); }catch(_){ return null; }
 }
 
+// Abre/fecha modais simples (display: block/none)
 function openModal(id){ $(`#${id}`).style.display='block'; }
 function closeModal(id){ $(`#${id}`).style.display='none'; }
 
 // =====================
 // Overview / Cards
 // =====================
+// Busca KPIs do sistema e preenche os cards do dashboard
 async function loadOverview(){
   try{
     const res = await authed(`${API_BASE}/stats/overview`);
@@ -234,8 +255,9 @@ async function loadOverview(){
 }
 
 // =====================
-// Controle de Acesso
+// Controle de Acesso (Áreas)
 // =====================
+// Carrega as áreas permitidas ao usuário atual e preenche o <select>
 async function loadAllowedAreas(){
   try{
     const r = await authed(`${API_BASE}/areas/allowed`);
@@ -244,6 +266,7 @@ async function loadAllowedAreas(){
     const sel = $('#area-select');
     sel.innerHTML = '<option value="">Selecione uma área</option>';
 
+    // Se for admin (retorna ["*"]), mostra todas as áreas conhecidas
     const base = (areas.includes('*'))
       ? ['recepcao','escritorio1','gerencia','sala_reuniao']
       : areas;
@@ -256,6 +279,7 @@ async function loadAllowedAreas(){
   }catch(_){}
 }
 
+// Envia tentativa de acesso à área e exibe resultado (permitido/negado)
 async function handleAreaAccess(){
   const area = $('#area-select').value;
   if (!area) { alert('Selecione uma área.'); return; }
@@ -272,7 +296,7 @@ async function handleAreaAccess(){
           <p>Área: <b>${log.area}</b></p>
           <p>${new Date(log.timestamp).toLocaleString()}</p>
         </div>`;
-      await loadOverview();
+      await loadOverview(); // atualiza KPIs
     }else{
       const err = await safeJson(res);
       resDiv.innerHTML = `
@@ -286,8 +310,9 @@ async function handleAreaAccess(){
 }
 
 // =====================
-// Recursos
+// Recursos (CRUD + Listagem)
 // =====================
+// Busca lista paginada de recursos conforme filtros atuais
 async function loadResources(){
   const q = $('#resource-search').value.trim();
   const cat = $('#resource-category').value.trim();
@@ -306,6 +331,7 @@ async function loadResources(){
   }catch(_){}
 }
 
+// Renderiza tabela de recursos, paginação e ações de editar/excluir
 function renderResources(list){
   const tbody = $('#resources-tbody');
   tbody.innerHTML = '';
@@ -323,13 +349,13 @@ function renderResources(list){
     tbody.appendChild(tr);
   });
 
-  // paginação
+  // Paginação (texto e habilitação dos botões)
   const pages = Math.max(1, Math.ceil((list.total||0) / (list.size||resSize)));
   $('#page-info').textContent = `Página ${list.page} de ${pages}`;
   $('#prev-page').disabled = list.page<=1;
   $('#next-page').disabled = list.page>=pages;
 
-  // ações
+  // Liga os botões de ação da tabela
   tbody.querySelectorAll('[data-edit]').forEach(btn=>{
     btn.addEventListener('click', ()=> editResource(btn.getAttribute('data-edit')));
   });
@@ -338,6 +364,7 @@ function renderResources(list){
   });
 }
 
+// Abre modal de recurso (vazio para criar, preenchido para editar)
 function openResourceModal(resource=null){
   $('#resource-modal-title').textContent = resource ? 'Editar Recurso' : 'Adicionar Recurso';
   $('#resource-id').value = resource?.id || '';
@@ -349,6 +376,7 @@ function openResourceModal(resource=null){
   openModal('resource-modal');
 }
 
+// Busca um recurso específico e abre o modal de edição
 async function editResource(id){
   const r = await authed(`${API_BASE}/resources/${id}`);
   if (!r.ok) return;
@@ -356,6 +384,7 @@ async function editResource(id){
   openResourceModal(resource);
 }
 
+// Submit do formulário (criar/atualizar recurso)
 async function handleResourceSubmit(e){
   e.preventDefault();
   const id = $('#resource-id').value;
@@ -384,9 +413,10 @@ async function handleResourceSubmit(e){
   }
   closeModal('resource-modal');
   await loadResources();
-  await loadOverview();
+  await loadOverview(); // KPIs podem mudar (ex.: total_resources)
 }
 
+// Exclui um recurso por ID (confirma antes)
 async function deleteResource(id){
   if (!confirm(`Apagar recurso #${id}?`)) return;
   const r = await authed(`${API_BASE}/resources/${id}`, { method:'DELETE' });
@@ -400,8 +430,9 @@ async function deleteResource(id){
 }
 
 // =====================
-// Logs
+// Logs (listagem)
 // =====================
+// Carrega logs (com filtros opcionalmente: user_id, area, allowed)
 async function loadLogs(){
   const u = $('#log-user').value.trim();
   const a = $('#log-area').value.trim();
@@ -434,6 +465,7 @@ async function loadLogs(){
 // =====================
 // Usuários (ADMIN)
 // =====================
+// Carrega usuários com paginação e filtros (apenas visível para admin)
 async function loadUsers(){
   const q = $('#user-search').value.trim();
   const role = $('#user-role-filter').value;
@@ -443,8 +475,8 @@ async function loadUsers(){
   if (role) params.set('role', role);
 
   const r = await authed(`${API_BASE}/users?${params.toString()}`);
-  if (!r.ok) { 
-    // exibe vazio se não for admin
+  if (!r.ok) {
+    // Se não for admin, a API retorna 403 → mostra mensagem simples
     $('#users-tbody').innerHTML = '<tr><td colspan="4" style="text-align:center">Sem permissão ou nenhum dado.</td></tr>';
     return;
   }
@@ -465,11 +497,13 @@ async function loadUsers(){
     tbody.appendChild(tr);
   });
 
+  // Paginação de usuários
   const pages = Math.max(1, Math.ceil((data.total||0) / (data.size||usersSize)));
   $('#users-page-info').textContent = `Página ${data.page} de ${pages}`;
   $('#users-prev').disabled = data.page<=1;
   $('#users-next').disabled = data.page>=pages;
 
+  // Ações da tabela (editar/deletar)
   tbody.querySelectorAll('[data-uedit]').forEach(btn=>{
     btn.addEventListener('click', ()=> openUserEdit(btn.getAttribute('data-uedit')));
   });
@@ -478,6 +512,7 @@ async function loadUsers(){
   });
 }
 
+// Abre modal de “Novo Usuário”
 function openUserModal(){
   $('#user-modal-title').textContent = 'Novo Usuário';
   $('#user-id').value = '';
@@ -487,6 +522,7 @@ function openUserModal(){
   openModal('user-modal');
 }
 
+// Busca usuário por ID e abre modal de edição preenchido
 async function openUserEdit(id){
   const r = await authed(`${API_BASE}/users/${id}`);
   if (!r.ok) return;
@@ -494,11 +530,12 @@ async function openUserEdit(id){
   $('#user-modal-title').textContent = `Editar Usuário #${u.id}`;
   $('#user-id').value = u.id;
   $('#new-username').value = u.username;
-  $('#new-password').value = ''; // opcional
+  $('#new-password').value = ''; // senha opcional em update
   $('#new-role').value = u.role;
   openModal('user-modal');
 }
 
+// Submit do formulário do usuário (criar/editar)
 async function handleUserSubmit(e){
   e.preventDefault();
   const id = $('#user-id').value;
@@ -506,10 +543,12 @@ async function handleUserSubmit(e){
 
   const payload = {
     username: $('#new-username').value.trim(),
-    password: $('#new-password').value.trim() || undefined, // em update pode ficar vazio
+    // Se em update deixar senha vazia, envia undefined para não trocar
+    password: $('#new-password').value.trim() || undefined,
     role: $('#new-role').value
   };
 
+  // Para criar: POST /auth/register | Para editar: PUT /users/{id}
   const url = isEdit ? `${API_BASE}/users/${id}` : `${API_BASE}/auth/register`;
   const method = isEdit ? 'PUT' : 'POST';
 
@@ -528,6 +567,7 @@ async function handleUserSubmit(e){
   await loadUsers();
 }
 
+// Exclui um usuário (apenas admin)
 async function deleteUser(id){
   if (!confirm(`Apagar usuário #${id}?`)) return;
   const r = await authed(`${API_BASE}/users/${id}`, { method:'DELETE' });
